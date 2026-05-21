@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model bookings {
+  id           BigInt   @id @default(autoincrement())
+  booking_date String?  @db.VarChar(255)
+  quantity     Int
+  status       String?  @db.VarChar(255)
+  consumer_id  BigInt
+  supplier_id  BigInt
+  consumer     consumer @relation(fields: [consumer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK8anipma7iixckxi1csehosqg3")
+  supplier     supplier @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKr4fpu25eibjyk6drpilbv05e7")
+
+  @@index([consumer_id], map: "FK8anipma7iixckxi1csehosqg3")
+  @@index([supplier_id], map: "FKr4fpu25eibjyk6drpilbv05e7")
+}
+
+model consumer {
+  address   String?    @db.VarChar(255)
+  full_name String?    @db.VarChar(255)
+  id        BigInt     @id
+  bookings  bookings[]
+  user      user       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsvw78kv9yjej2q9pjh5wo77f2")
+}
+
+model supplier {
+  company_name String?    @db.VarChar(255)
+  service_area String?    @db.VarChar(255)
+  id           BigInt     @id
+  bookings     bookings[]
+  user         user       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKt7uy0l5oj385g3dixgj2bi9fh")
+}
+
+model user {
+  id       BigInt    @id @default(autoincrement())
+  email    String?   @db.VarChar(255)
+  name     String?   @db.VarChar(255)
+  password String?   @db.VarChar(255)
+  phone    String?   @db.VarChar(255)
+  role     String?   @db.VarChar(255)
+  consumer consumer?
+  supplier supplier?
+}
