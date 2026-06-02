@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: Params) {
     
     const suppliers = await db.supplier.findMany({
       where: {
-        serviceArea: {
+        service_area: {
           contains: decodeURIComponent(area),
         }
       }
