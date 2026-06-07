@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 💧 Water Connect API
 
-## Getting Started
+A water supply booking system backend built with Next.js, Prisma, and MySQL.
 
-First, run the development server:
+## 🚀 Setup
 
-```bash
+### Install Dependencies
+npm install
+
+### Setup Environment
+Create .env file:
+DATABASE_URL="mysql://root:password@localhost:3306/waterconndb"
+JWT_SECRET="your-secret-key"
+
+### Run Database Migration
+npx prisma migrate dev
+
+### Start Server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📌 API Endpoints
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🔐 Auth
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | /api/auth/register/consumer | Register consumer |
+| POST | /api/auth/register/supplier | Register supplier |
+| POST | /api/auth/login | Login |
 
-## Learn More
+### 👤 Profile
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET | /api/profile/[id] | Get profile |
+| PUT | /api/profile/[id] | Update profile |
 
-To learn more about Next.js, take a look at the following resources:
+### 📅 Booking
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | /api/booking | Create booking |
+| PUT | /api/booking/[id]/accept | Accept booking |
+| PUT | /api/booking/[id]/reject | Reject booking |
+| PUT | /api/booking/[id]/complete | Complete booking |
+| GET | /api/booking/lookup/consumer/[id] | Consumer bookings |
+| GET | /api/booking/lookup/supplier/[id] | Supplier bookings |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 💳 Payment
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | /api/payment | Create payment |
+| GET | /api/payment/[id] | Get payment |
+| PUT | /api/payment/[id] | Update status |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### ⭐ Rating
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | /api/rating | Submit rating |
+| GET | /api/rating/supplier/[id] | Get ratings |
 
-## Deploy on Vercel
+### 🔧 Supplier Type
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | /api/suppliertype | Add vehicle info |
+| GET | /api/suppliertype/[id] | Get vehicle info |
+| PUT | /api/suppliertype/[id] | Update vehicle info |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 👑 Admin
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET | /api/admin/users | Get all users |
+| DELETE | /api/admin/users/[id] | Delete user |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🛠️ Tech Stack
+- Next.js 16 (App Router)
+- Prisma ORM
+- MySQL
+- TypeScript
+- bcryptjs (Password Hashing)
