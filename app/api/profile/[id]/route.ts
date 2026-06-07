@@ -5,89 +5,132 @@ interface Params {
   params: Promise<{ id: string }>;
 }
 
-// Custom serializer to handle BigInt conversions safely
-function serializeData(data: any) {
-  return JSON.parse(
-    JSON.stringify(data, (key, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    )
-  );
-}
+const ALLOWED_ROLES = ["USER", "CONSUMER", "SUPPLIER", "ADMIN"];
 
-// ==========================================
-// 1. GET PROFILE (Equivalent to @GetMapping("/{id}"))
-// ==========================================
+// ✅ No serializeData needed!
+
 export async function GET(request: Request, { params }: Params) {
   try {
     const { id } = await params;
 
-    // Fetch user and include their connected role details automatically
+    if (!id || isNaN(Number(id))) {
+      return NextResponse.json(
+        { success: false, message: "Invalid profile ID format" },
+        { status: 400 }
+      );
+    }
+
     const userProfile = await db.user.findUnique({
       where: { id: BigInt(id) },
-      include: {
-        consumer: true,
-        supplier: true,
-      },
+      include: { consumer: true, supplier: true },
     });
 
     if (!userProfile) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: `Profile with ID ${id} not found` },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json(serializeData(userProfile), { status: 200 });
-  } catch (error) {
-    console.error("Get profile error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    // ✅ Return directly!
+    return NextResponse.json(
+      { success: true, profile: userProfile },
+      { status: 200 }
+    );
+
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: "Internal Server Error", details: error.message },
+      { status: 500 }
+    );
   }
 }
 
-// ==========================================
-// 2. UPDATE PROFILE (Equivalent to @PutMapping("/update/{id}"))
-// ==========================================
 export async function PUT(request: Request, { params }: Params) {
   try {
     const { id } = await params;
-    const body = await request.json(); // Reads the generic dynamic fields sent by frontend
+    const body = await request.json();
 
-    // Destructure properties to separate core User fields from sub-role fields
-    const { email, name, password, phone, role, consumer, supplier } = body;
+    if (!id || isNaN(Number(id))) {
+      return NextResponse.json(
+        { success: false, message: "Invalid profile ID format" },
+        { status: 400 }
+      );
+    }
 
-    // Perform an atomic update operation using Prisma's nested update capabilities
-    const updatedUser = await db.user.update({
+    const existingUser = await db.user.findUnique({
       where: { id: BigInt(id) },
-      data: {
-        // Only update fields if they are provided in the payload body
-        email: email,
-        name: name,
-        password: password,
-        phone: phone,
-        role: role,
-        
-        // If consumer fields are passed, update the nested relation table
-        consumer: consumer ? {
-          update: {
-            address: consumer.address,
-            full_name: consumer.full_name,
-          }
-        } : undefined,
-
-        // If supplier fields are passed, update the nested relation table
-        supplier: supplier ? {
-          update: {
-            company_name: supplier.company_name,
-            service_area: supplier.service_area,
-          }
-        } : undefined,
-      },
-      include: {
-        consumer: true,
-        supplier: true,
-      }
+      include: { consumer: true, supplier: true },
     });
 
-    return NextResponse.json(serializeData(updatedUser), { status: 200 });
-  } catch (error) {
-    console.error("Update profile error:", error);
-    return NextResponse.json({ error: "Failed to update profile data" }, { status: 400 });
+    if (!existingUser) {
+      return NextResponse.json(
+        { success: false, message: `Profile with ID ${id} not found` },
+        { status: 404 }
+      );
+    }
+
+    const { email, name, password, phone, role, consumer, supplier } = body;
+
+    if (role && !ALLOWED_ROLES.includes(role)) {
+      return NextResponse.json(
+        { success: false, message: `Invalid role. Allowed: ${ALLOWED_ROLES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    const userUpdateData: any = {};
+    if (email    !== undefined) userUpdateData.email    = email;
+    if (name     !== undefined) userUpdateData.name     = name;
+    if (password !== undefined) userUpdateData.password = password;
+    if (phone    !== undefined) userUpdateData.phone    = phone;
+    if (role     !== undefined) userUpdateData.role     = role;
+
+    if (consumer && existingUser.consumer) {
+      userUpdateData.consumer = {
+        update: {
+          ...(consumer.address   !== undefined && { address:   consumer.address }),
+          ...(consumer.full_name !== undefined && { full_name: consumer.full_name }),
+        },
+      };
+    }
+
+    if (supplier && existingUser.supplier) {
+      userUpdateData.supplier = {
+        update: {
+          ...(supplier.company_name !== undefined && { company_name: supplier.company_name }),
+          ...(supplier.service_area !== undefined && { service_area: supplier.service_area }),
+        },
+      };
+    }
+
+    if (Object.keys(userUpdateData).length === 0) {
+      return NextResponse.json(
+        { success: false, message: "No valid fields provided to update" },
+        { status: 400 }
+      );
+    }
+
+    const updatedUser = await db.user.update({
+      where: { id: BigInt(id) },
+      data: userUpdateData,
+      include: { consumer: true, supplier: true },
+    });
+
+    // ✅ Return directly!
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Profile updated successfully",
+        profile: updatedUser,
+      },
+      { status: 200 }
+    );
+
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: "Failed to update profile", details: error.message },
+      { status: 400 }
+    );
   }
 }

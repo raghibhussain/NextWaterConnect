@@ -1,40 +1,11 @@
 generator client {
-  provider   = "prisma-client-js"
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
-}
-
-model bookings {
-  id           BigInt   @id @default(autoincrement())
-  booking_date String?  @db.VarChar(255)
-  quantity     Int
-  status       String?  @db.VarChar(255)
-  consumer_id  BigInt
-  supplier_id  BigInt
-  consumer     consumer @relation(fields: [consumer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK8anipma7iixckxi1csehosqg3")
-  supplier     supplier @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKr4fpu25eibjyk6drpilbv05e7")
-
-  @@index([consumer_id], map: "FK8anipma7iixckxi1csehosqg3")
-  @@index([supplier_id], map: "FKr4fpu25eibjyk6drpilbv05e7")
-}
-
-model consumer {
-  address   String?    @db.VarChar(255)
-  full_name String?    @db.VarChar(255)
-  id        BigInt     @id
-  bookings  bookings[]
-  user      user       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsvw78kv9yjej2q9pjh5wo77f2")
-}
-
-model supplier {
-  company_name String?    @db.VarChar(255)
-  service_area String?    @db.VarChar(255)
-  id           BigInt     @id
-  bookings     bookings[]
-  user         user       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKt7uy0l5oj385g3dixgj2bi9fh")
 }
 
 model user {
@@ -46,4 +17,77 @@ model user {
   role     String?   @db.VarChar(255)
   consumer consumer?
   supplier supplier?
+}
+
+model consumer {
+  address   String?    @db.VarChar(255)
+  full_name String?    @db.VarChar(255)
+  id        BigInt     @id
+  bookings  bookings[]
+  payments  payment[]
+  ratings   rating[]
+  user      user       @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsvw78kv9yjej2q9pjh5wo77f2")
+}
+
+model supplier {
+  company_name  String?        @db.VarChar(255)
+  service_area  String?        @db.VarChar(255)
+  id            BigInt         @id
+  bookings      bookings[]
+  payments      payment[]
+  ratings       rating[]
+  supplier_type supplier_type?
+  user          user           @relation(fields: [id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKt7uy0l5oj385g3dixgj2bi9fh")
+}
+
+model bookings {
+  id           BigInt    @id @default(autoincrement())
+  booking_date String?   @db.VarChar(255)
+  quantity     Int
+  status       String?   @db.VarChar(255)
+  consumer_id  BigInt
+  supplier_id  BigInt
+  payment      payment?
+  consumer     consumer  @relation(fields: [consumer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK8anipma7iixckxi1csehosqg3")
+  supplier     supplier  @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKr4fpu25eibjyk6drpilbv05e7")
+
+  @@index([consumer_id], map: "FK8anipma7iixckxi1csehosqg3")
+  @@index([supplier_id], map: "FKr4fpu25eibjyk6drpilbv05e7")
+}
+
+model payment {
+  id          BigInt   @id @default(autoincrement())
+  method      String?  @db.VarChar(255)
+  status      String?  @db.VarChar(255)
+  amount      Float?
+  consumer_id BigInt
+  supplier_id BigInt
+  booking_id  BigInt   @unique
+  consumer    consumer @relation(fields: [consumer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supplier    supplier @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  booking     bookings @relation(fields: [booking_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([consumer_id])
+  @@index([supplier_id])
+}
+
+model rating {
+  id          BigInt   @id @default(autoincrement())
+  stars       Int?
+  comment     String?  @db.VarChar(500)
+  consumer_id BigInt
+  supplier_id BigInt
+  consumer    consumer @relation(fields: [consumer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supplier    supplier @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([consumer_id])
+  @@index([supplier_id])
+}
+
+model supplier_type {
+  id          BigInt   @id @default(autoincrement())
+  vehicle_no  String?  @db.VarChar(255)
+  category    String?  @db.VarChar(255)
+  supplier_id BigInt   @unique
+  supplier    supplier @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

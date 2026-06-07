@@ -1,39 +1,55 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-function serializeData(data: any) {
-  return JSON.parse(
-    JSON.stringify(data, (key, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    )
-  );
-}
+// ✅ No serializeData needed!
 
-// POST /api/auth/login
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { email, password } = body;
 
-    // Look up user including linked sub-role profiles automatically
+    if (!email || !password) {
+      return NextResponse.json(
+        { success: false, message: "Email and password are required" },
+        { status: 400 }
+      );
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid email format" },
+        { status: 400 }
+      );
+    }
+
     const foundUser = await db.user.findFirst({
-      where: {
-        email: email,
-        password: password, // Consider hashing passwords when migrating completely
-      },
-      include: {
-        consumer: true,
-        supplier: true,
-      },
+      where: { email, password },
+      include: { consumer: true, supplier: true },
     });
 
     if (!foundUser) {
-      return NextResponse.json({ message: "Invalid email or password" }, { status: 200 });
+      return NextResponse.json(
+        { success: false, message: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json(serializeData(foundUser), { status: 200 });
-  } catch (error) {
-    console.error("Login endpoint error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    // ✅ Return directly - BigInt auto-serializes!
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Login successful",
+        role: foundUser.role,
+        user: foundUser,
+      },
+      { status: 200 }
+    );
+
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: "Internal Server Error", details: error.message },
+      { status: 500 }
+    );
   }
 }
