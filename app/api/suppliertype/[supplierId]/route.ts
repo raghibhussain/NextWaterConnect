@@ -5,7 +5,7 @@ interface Params {
   params: Promise<{ supplierId: string }>;
 }
 
-const VALID_CATEGORIES = ["Tanker", "Pipeline", "Bowser", "Other"];
+const VALID_CATEGORIES = ["Tanker", "Drinking Water"];
 
 // GET /api/suppliertype/[supplierId]
 export async function GET(request: Request, { params }: Params) {

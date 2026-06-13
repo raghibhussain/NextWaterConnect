@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const VALID_CATEGORIES = ["Tanker", "Pipeline", "Bowser", "Other"];
+const VALID_CATEGORIES = ["Tanker", "Drinking Water"];
 
 // POST /api/suppliertype
 export async function POST(request: Request) {
