@@ -486,7 +486,7 @@ function HeroSection() {
             transition={{ delay: 0.5, duration: 0.8 }}
             className="text-5xl md:text-7xl lg:text-8xl font-black text-blue-200 leading-tight"
           >
-            Right to Your Door
+            Right to Your Door Step
           </motion.div>
         </div>
 
