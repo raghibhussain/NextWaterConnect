@@ -85,7 +85,7 @@ export default function ReviewModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-6 pt-10 overflow-y-auto"
           onClick={onClose}
         >
           <motion.div
@@ -93,7 +93,7 @@ export default function ReviewModal({
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-slate-900 rounded-2xl border border-slate-700 p-8 max-w-md w-full"
+            className="bg-slate-900 rounded-2xl border border-slate-700 p-8 max-w-md w-full max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">

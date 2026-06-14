@@ -8,7 +8,7 @@ import { useState } from "react";
 import {
   Droplets, Mail, Lock, Eye, EyeOff, User, Phone,
   MapPin, Truck, ArrowRight, AlertCircle, Sparkles,
-  Loader2, CheckCircle, Shield, Users, Store
+  Loader2, CheckCircle, Shield, Users, Store, DollarSign
 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -62,40 +62,19 @@ function Particles() {
         <motion.div
           key={i}
           className="absolute rounded-full bg-white/20"
-          style={{
-            left: p.left,
-            top: p.top,
-            width: p.size,
-            height: p.size,
-          }}
-          animate={{
-            y: [0, -40, 0],
-            opacity: [0.1, 0.6, 0.1],
-            scale: [1, 1.5, 1],
-          }}
-          transition={{
-            duration: p.duration,
-            repeat: Infinity,
-            delay: p.delay,
-            ease: "easeInOut",
-          }}
+          style={{ left: p.left, top: p.top, width: p.size, height: p.size }}
+          animate={{ y: [0, -40, 0], opacity: [0.1, 0.6, 0.1], scale: [1, 1.5, 1] }}
+          transition={{ duration: p.duration, repeat: Infinity, delay: p.delay, ease: "easeInOut" }}
         />
       ))}
-
       <motion.div
         className="absolute top-1/4 right-1/4 w-64 h-64 bg-cyan-400/10 rounded-full blur-3xl"
-        animate={{
-          scale: [1, 1.3, 1],
-          opacity: [0.3, 0.6, 0.3],
-        }}
+        animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
         transition={{ duration: 5, repeat: Infinity }}
       />
       <motion.div
         className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"
-        animate={{
-          scale: [1.2, 1, 1.2],
-          opacity: [0.6, 0.3, 0.6],
-        }}
+        animate={{ scale: [1.2, 1, 1.2], opacity: [0.6, 0.3, 0.6] }}
         transition={{ duration: 6, repeat: Infinity }}
       />
     </div>
@@ -110,24 +89,17 @@ function RippleBackground() {
         <motion.div
           key={ring}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-500/10"
-          style={{
-            width: `${ring * 300}px`,
-            height: `${ring * 300}px`,
-          }}
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.1, 0.3],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            delay: ring * 0.5,
-          }}
+          style={{ width: `${ring * 300}px`, height: `${ring * 300}px` }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+          transition={{ duration: 4, repeat: Infinity, delay: ring * 0.5 }}
         />
       ))}
     </div>
   );
 }
+
+// ✅ Pakistan vehicle plate format: ABC-1234 (3 letters, dash, 4 digits)
+const PLATE_REGEX = /^[A-Z]{3}-\d{4}$/;
 
 // ============ MAIN REGISTER PAGE ============
 export default function RegisterPage() {
@@ -147,17 +119,31 @@ export default function RegisterPage() {
     // Supplier specific
     vehicleNo: "",
     category: "",
+    pricePerGallon: "",  // ✅ ADDED: price_per_gallon field
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ✅ Auto-format plate as user types: convert to uppercase, insert dash
+  const handleVehicleNoChange = (value: string) => {
+    // Strip everything except letters and digits
+    const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    let formatted = cleaned;
+
+    // Auto-insert dash after 3 letters
+    if (cleaned.length > 3) {
+      formatted = cleaned.slice(0, 3) + "-" + cleaned.slice(3, 7);
+    }
+
+    setFormData({ ...formData, vehicleNo: formatted });
+    setErrors({ ...errors, vehicleNo: "" });
+  };
 
   // Validate form
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
-    }
+    if (!formData.name.trim()) newErrors.name = "Name is required";
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
@@ -181,8 +167,25 @@ export default function RegisterPage() {
       newErrors.phone = "Phone must be 11 digits (e.g., 03001234567)";
     }
 
-    if (!formData.area.trim()) {
-      newErrors.area = "Area is required";
+    if (!formData.area.trim()) newErrors.area = "Area is required";
+
+    // ✅ Supplier-specific validations
+    if (role === "SUPPLIER") {
+      if (!formData.category) {
+        newErrors.category = "Vehicle category is required";
+      }
+
+      if (!formData.vehicleNo.trim()) {
+        newErrors.vehicleNo = "Vehicle number is required";
+      } else if (!PLATE_REGEX.test(formData.vehicleNo)) {
+        newErrors.vehicleNo = "Format must be ABC-1234 (3 letters, dash, 4 digits)";
+      }
+
+      if (!formData.pricePerGallon) {
+        newErrors.pricePerGallon = "Price per gallon is required";
+      } else if (isNaN(Number(formData.pricePerGallon)) || Number(formData.pricePerGallon) <= 0) {
+        newErrors.pricePerGallon = "Enter a valid price greater than 0";
+      }
     }
 
     setErrors(newErrors);
@@ -194,9 +197,7 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error("Please fix the errors in the form", {
-        icon: "⚠️",
-      });
+      toast.error("Please fix the errors in the form", { icon: "⚠️" });
       return;
     }
 
@@ -205,7 +206,6 @@ export default function RegisterPage() {
     try {
       const endpoint = `/api/auth/register/${role.toLowerCase()}`;
 
-      // ✅ Build payload matching backend expectations
       const payload =
         role === "CONSUMER"
           ? {
@@ -224,56 +224,35 @@ export default function RegisterPage() {
             };
 
       console.log("📤 Registering user:", endpoint);
-      console.log("📦 Payload:", JSON.stringify(payload, null, 2));
-
       const response = await axios.post(endpoint, payload);
-
       console.log("✅ User registered:", response.data);
 
-      // ✅ If SUPPLIER and has vehicle details, create supplier_type
-      if (role === "SUPPLIER" && (formData.category || formData.vehicleNo)) {
+      // ✅ Create supplier_type with all required fields including price_per_gallon
+      if (role === "SUPPLIER") {
         const supplierId = response.data.user.id;
-
-        if (!formData.category || !formData.vehicleNo) {
-          toast.error("Both vehicle category and number are required", {
-            icon: "⚠️",
-          });
-          setLoading(false);
-          return;
-        }
 
         console.log("🚛 Creating supplier type for supplier ID:", supplierId);
 
-        try {
-          const supplierTypePayload = {
-            supplier_id: supplierId,
-            vehicle_no: formData.vehicleNo.trim(),
-            category: formData.category,
-          };
+        const supplierTypePayload = {
+          supplier_id: supplierId,
+          vehicle_no: formData.vehicleNo.trim(),
+          category: formData.category,
+          price_per_gallon: parseFloat(formData.pricePerGallon), // ✅ FIXED: now sent
+        };
 
-          console.log("📦 Supplier Type Payload:", supplierTypePayload);
+        console.log("📦 Supplier Type Payload:", supplierTypePayload);
 
-          const supplierTypeResponse = await axios.post(
-            "/api/suppliertype",
-            supplierTypePayload
-          );
+        // ✅ FIXED: if this fails, stop and show error — don't redirect to login
+        const supplierTypeResponse = await axios.post(
+          "/api/suppliertype",
+          supplierTypePayload
+        );
 
-          console.log("✅ Supplier type created:", supplierTypeResponse.data);
-        } catch (supplierTypeError: any) {
-          console.error("❌ Supplier type creation failed:", supplierTypeError);
-          toast.error(
-            supplierTypeError.response?.data?.message ||
-              "Failed to add vehicle details. You can add them later from your profile.",
-            { icon: "⚠️", duration: 5000 }
-          );
-        }
+        console.log("✅ Supplier type created:", supplierTypeResponse.data);
       }
 
-      toast.success("🎉 Account created successfully!", {
-        duration: 3000,
-      });
+      toast.success("🎉 Account created successfully!", { duration: 3000 });
 
-      // Clear form
       setFormData({
         name: "",
         email: "",
@@ -283,12 +262,13 @@ export default function RegisterPage() {
         area: "",
         vehicleNo: "",
         category: "",
+        pricePerGallon: "",
       });
 
-      // Redirect to login after 1.5 seconds
       setTimeout(() => {
         router.push("/login");
       }, 1500);
+
     } catch (error: any) {
       console.error("❌ Registration error:", error);
 
@@ -297,10 +277,7 @@ export default function RegisterPage() {
         error.response?.data?.error ||
         "Registration failed. Please try again.";
 
-      toast.error(errorMessage, {
-        icon: "❌",
-        duration: 4000,
-      });
+      toast.error(errorMessage, { icon: "❌", duration: 4000 });
     } finally {
       setLoading(false);
     }
@@ -381,10 +358,7 @@ export default function RegisterPage() {
               </span>
             </motion.div>
 
-            <motion.h1
-              variants={fadeUp}
-              className="text-3xl font-black text-white mb-2"
-            >
+            <motion.h1 variants={fadeUp} className="text-3xl font-black text-white mb-2">
               Join WaterConnect
             </motion.h1>
             <motion.p variants={fadeUp} className="text-slate-400">
@@ -402,14 +376,12 @@ export default function RegisterPage() {
                   onClick={() => {
                     setRole(r);
                     if (r === "CONSUMER") {
-                      const { vehicleNo, category, ...rest } = errors;
+                      const { vehicleNo, category, pricePerGallon, ...rest } = errors;
                       setErrors(rest);
                     }
                   }}
                   className={`relative flex-1 py-3 rounded-xl font-semibold text-sm transition-all ${
-                    role === r
-                      ? "text-white"
-                      : "text-slate-400 hover:text-slate-300"
+                    role === r ? "text-white" : "text-slate-400 hover:text-slate-300"
                   }`}
                   whileHover={{ scale: role === r ? 1 : 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -422,11 +394,7 @@ export default function RegisterPage() {
                     />
                   )}
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    {r === "CONSUMER" ? (
-                      <Users className="w-4 h-4" />
-                    ) : (
-                      <Store className="w-4 h-4" />
-                    )}
+                    {r === "CONSUMER" ? <Users className="w-4 h-4" /> : <Store className="w-4 h-4" />}
                     {r}
                   </span>
                 </motion.button>
@@ -462,34 +430,22 @@ export default function RegisterPage() {
                         setErrors({ ...errors, name: "" });
                       }}
                       className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
-                        errors.name
-                          ? "border-red-500/50"
-                          : "border-slate-700 focus:border-cyan-500"
+                        errors.name ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                       } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
-                      placeholder={
-                        role === "CONSUMER"
-                          ? "Enter your full name"
-                          : "Enter company name"
-                      }
+                      placeholder={role === "CONSUMER" ? "Enter your full name" : "Enter company name"}
                     />
                   </div>
                   {errors.name && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.name}
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                      className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />{errors.name}
                     </motion.p>
                   )}
                 </motion.div>
 
                 {/* Email */}
                 <motion.div variants={slideIn}>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Email Address
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">Email Address</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
                       <Mail className="w-5 h-5" />
@@ -502,21 +458,15 @@ export default function RegisterPage() {
                         setErrors({ ...errors, email: "" });
                       }}
                       className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
-                        errors.email
-                          ? "border-red-500/50"
-                          : "border-slate-700 focus:border-cyan-500"
+                        errors.email ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                       } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                       placeholder="you@example.com"
                     />
                   </div>
                   {errors.email && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.email}
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                      className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />{errors.email}
                     </motion.p>
                   )}
                 </motion.div>
@@ -524,9 +474,7 @@ export default function RegisterPage() {
                 {/* Phone & Area */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <motion.div variants={slideIn}>
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">
-                      Phone Number
-                    </label>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">Phone Number</label>
                     <div className="relative group">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
                         <Phone className="w-5 h-5" />
@@ -539,21 +487,15 @@ export default function RegisterPage() {
                           setErrors({ ...errors, phone: "" });
                         }}
                         className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
-                          errors.phone
-                            ? "border-red-500/50"
-                            : "border-slate-700 focus:border-cyan-500"
+                          errors.phone ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                         } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                         placeholder="03001234567"
                       />
                     </div>
                     {errors.phone && (
-                      <motion.p
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                      >
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.phone}
+                      <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                        className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" />{errors.phone}
                       </motion.p>
                     )}
                   </motion.div>
@@ -574,21 +516,15 @@ export default function RegisterPage() {
                           setErrors({ ...errors, area: "" });
                         }}
                         className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
-                          errors.area
-                            ? "border-red-500/50"
-                            : "border-slate-700 focus:border-cyan-500"
+                          errors.area ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                         } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                         placeholder="e.g. Gulshan, Karachi"
                       />
                     </div>
                     {errors.area && (
-                      <motion.p
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                      >
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.area}
+                      <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                        className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" />{errors.area}
                       </motion.p>
                     )}
                   </motion.div>
@@ -609,22 +545,19 @@ export default function RegisterPage() {
                     >
                       <Sparkles className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                       <div className="text-sm">
-                        <p className="text-blue-300 font-semibold mb-1">
-                          Vehicle Details (Optional)
-                        </p>
+                        <p className="text-blue-300 font-semibold mb-1">Vehicle Details</p>
                         <p className="text-slate-400 leading-relaxed">
-                          Add your vehicle information now or complete it later from your dashboard.
+                          All fields are required to complete your supplier registration.
                         </p>
                       </div>
                     </motion.div>
 
+                    {/* Category & Vehicle No */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Category */}
                       <motion.div variants={slideIn}>
                         <label className="block text-sm font-semibold text-slate-300 mb-2">
-                          Vehicle Category{" "}
-                          <span className="text-slate-500 font-normal text-xs">
-                            (Optional)
-                          </span>
+                          Vehicle Category
                         </label>
                         <div className="relative group">
                           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
@@ -633,26 +566,31 @@ export default function RegisterPage() {
                           <select
                             value={formData.category}
                             onChange={(e) => {
-                              setFormData({
-                                ...formData,
-                                category: e.target.value,
-                              });
+                              setFormData({ ...formData, category: e.target.value });
+                              setErrors({ ...errors, category: "" });
                             }}
-                            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-cyan-500 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                            className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
+                              errors.category ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
+                            } text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                           >
                             <option value="">Select category</option>
                             <option value="Tanker">Tanker</option>
                             <option value="Drinking Water">Drinking Water</option>
                           </select>
                         </div>
+                        {errors.category && (
+                          <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                            className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />{errors.category}
+                          </motion.p>
+                        )}
                       </motion.div>
 
+                      {/* ✅ Vehicle Number with enforced format ABC-1234 */}
                       <motion.div variants={slideIn}>
                         <label className="block text-sm font-semibold text-slate-300 mb-2">
-                          Vehicle Number{" "}
-                          <span className="text-slate-500 font-normal text-xs">
-                            (Optional)
-                          </span>
+                          Vehicle Number
+                          <span className="text-slate-500 font-normal text-xs ml-2">ABC-1234</span>
                         </label>
                         <div className="relative group">
                           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
@@ -661,26 +599,60 @@ export default function RegisterPage() {
                           <input
                             type="text"
                             value={formData.vehicleNo}
-                            onChange={(e) => {
-                              setFormData({
-                                ...formData,
-                                vehicleNo: e.target.value,
-                              });
-                            }}
-                            className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-cyan-500 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                            placeholder="e.g. ABC-1234"
+                            onChange={(e) => handleVehicleNoChange(e.target.value)}
+                            maxLength={8}
+                            className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
+                              errors.vehicleNo ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
+                            } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all tracking-widest font-mono`}
+                            placeholder="ABC-1234"
                           />
                         </div>
+                        {errors.vehicleNo && (
+                          <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                            className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />{errors.vehicleNo}
+                          </motion.p>
+                        )}
                       </motion.div>
                     </div>
+
+                    {/* ✅ Price per gallon — NEW FIELD */}
+                    <motion.div variants={slideIn}>
+                      <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        Price Per Gallon (Rs.)
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          value={formData.pricePerGallon}
+                          onChange={(e) => {
+                            setFormData({ ...formData, pricePerGallon: e.target.value });
+                            setErrors({ ...errors, pricePerGallon: "" });
+                          }}
+                          className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800/50 border ${
+                            errors.pricePerGallon ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
+                          } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
+                          placeholder="e.g. 150"
+                        />
+                      </div>
+                      {errors.pricePerGallon && (
+                        <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                          className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-4 h-4" />{errors.pricePerGallon}
+                        </motion.p>
+                      )}
+                    </motion.div>
                   </motion.div>
                 )}
 
                 {/* Password */}
                 <motion.div variants={slideIn}>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Password
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">Password</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
                       <Lock className="w-5 h-5" />
@@ -693,9 +665,7 @@ export default function RegisterPage() {
                         setErrors({ ...errors, password: "" });
                       }}
                       className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-slate-800/50 border ${
-                        errors.password
-                          ? "border-red-500/50"
-                          : "border-slate-700 focus:border-cyan-500"
+                        errors.password ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                       } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                       placeholder="••••••••"
                     />
@@ -706,30 +676,20 @@ export default function RegisterPage() {
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </motion.button>
                   </div>
                   {errors.password && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.password}
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                      className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />{errors.password}
                     </motion.p>
                   )}
                 </motion.div>
 
                 {/* Confirm Password */}
                 <motion.div variants={slideIn}>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Confirm Password
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">Confirm Password</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors">
                       <Lock className="w-5 h-5" />
@@ -738,43 +698,28 @@ export default function RegisterPage() {
                       type={showConfirmPassword ? "text" : "password"}
                       value={formData.confirmPassword}
                       onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          confirmPassword: e.target.value,
-                        });
+                        setFormData({ ...formData, confirmPassword: e.target.value });
                         setErrors({ ...errors, confirmPassword: "" });
                       }}
                       className={`w-full pl-12 pr-12 py-3.5 rounded-xl bg-slate-800/50 border ${
-                        errors.confirmPassword
-                          ? "border-red-500/50"
-                          : "border-slate-700 focus:border-cyan-500"
+                        errors.confirmPassword ? "border-red-500/50" : "border-slate-700 focus:border-cyan-500"
                       } text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all`}
                       placeholder="••••••••"
                     />
                     <motion.button
                       type="button"
-                      onClick={() =>
-                        setShowConfirmPassword(!showConfirmPassword)
-                      }
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      {showConfirmPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </motion.button>
                   </div>
                   {errors.confirmPassword && (
-                    <motion.p
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="text-red-400 text-sm mt-2 flex items-center gap-1"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.confirmPassword}
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                      className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />{errors.confirmPassword}
                     </motion.p>
                   )}
                 </motion.div>
@@ -819,9 +764,7 @@ export default function RegisterPage() {
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900 text-slate-500">
-                Already have an account?
-              </span>
+              <span className="px-4 bg-slate-900 text-slate-500">Already have an account?</span>
             </div>
           </motion.div>
 
