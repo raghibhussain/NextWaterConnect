@@ -170,36 +170,36 @@ export default function SearchSuppliers() {
             </motion.div>
 
             {/* Search Bar */}
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder="Enter area (e.g., Gulshan, Karachi)"
-                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-500 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                />
-              </div>
+<div className="flex flex-col sm:flex-row gap-3">
+  <div className="flex-1 relative">
+    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+    <input
+      type="text"
+      value={area}
+      onChange={(e) => setArea(e.target.value)}
+      onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+      placeholder="Enter area (e.g., Gulshan, Karachi)"
+      className="w-full pl-12 pr-4 py-4 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-500 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
+    />
+  </div>
 
-              <motion.button
-                onClick={handleSearch}
-                disabled={loading}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all disabled:opacity-50"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {loading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Search className="w-5 h-5" />
-                    Search
-                  </div>
-                )}
-              </motion.button>
-            </div>
+  <motion.button
+    onClick={handleSearch}
+    disabled={loading}
+    className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all disabled:opacity-50 flex items-center justify-center"
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+  >
+    {loading ? (
+      <Loader2 className="w-6 h-6 animate-spin" />
+    ) : (
+      <div className="flex items-center gap-2">
+        <Search className="w-5 h-5" />
+        Search
+      </div>
+    )}
+  </motion.button>
+</div>
           </div>
         </motion.div>
 
@@ -333,7 +333,7 @@ export default function SearchSuppliers() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="my-4 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+                      className="mt-6 my-4 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-slate-400 text-sm">💰 Price per Gallon:</span>
