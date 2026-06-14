@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import {
   Calendar, Package, DollarSign, MapPin, Truck,
   Phone, Star, ArrowLeft, CheckCircle, Loader2,
-  AlertCircle, Info
+  AlertCircle, Info, Droplets
 } from "lucide-react";
 import Navbar from "@/app/components/dashboard/Navbar";
 import Link from "next/link";
@@ -24,6 +24,7 @@ interface Supplier {
   supplier_type?: {
     category: string;
     vehicle_no: string;
+    price_per_gallon: number;
   };
 }
 
@@ -44,7 +45,25 @@ export default function BookSupplier() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch supplier details
+  // ✅ Calculate total price
+  const totalPrice = formData.quantity && supplier?.supplier_type?.price_per_gallon
+    ? (parseInt(formData.quantity) * supplier.supplier_type.price_per_gallon).toFixed(2)
+    : "0.00";
+
+  // 🔍 DEBUG: Log calculation changes
+  useEffect(() => {
+    if (formData.quantity && supplier?.supplier_type?.price_per_gallon) {
+      const qty = parseInt(formData.quantity);
+      const pricePerGallon = supplier.supplier_type.price_per_gallon;
+      const total = qty * pricePerGallon;
+      
+      console.log("🔢 CALCULATION DEBUG:");
+      console.log(`   Quantity: ${qty} gallons`);
+      console.log(`   Price/Gallon: Rs. ${pricePerGallon}`);
+      console.log(`   Total: Rs. ${total.toFixed(2)}`);
+    }
+  }, [formData.quantity, supplier?.supplier_type?.price_per_gallon, totalPrice]);
+
   useEffect(() => {
     fetchSupplierDetails();
     loadConsumerData();
@@ -57,19 +76,28 @@ export default function BookSupplier() {
     }
   };
 
-  const fetchSupplierDetails = async () => {
-    try {
-      const response = await api.get(`/suppliertype/${supplierId}`);
-      console.log("📦 Supplier details:", response.data);
-      
-      setSupplier(response.data.supplier_type.supplier);
-      setLoading(false);
-    } catch (error: any) {
-      console.error("❌ Error fetching supplier:", error);
-      toast.error("Failed to load supplier details", { icon: "❌" });
-      setLoading(false);
-    }
-  };
+const fetchSupplierDetails = async () => {
+  try {
+    const response = await api.get(`/suppliertype/${supplierId}`);
+    const { supplier_type } = response.data;
+
+    // ✅ Merge supplier with its supplier_type so price_per_gallon is accessible
+    setSupplier({
+      ...supplier_type.supplier,
+      supplier_type: {
+        category: supplier_type.category,
+        vehicle_no: supplier_type.vehicle_no,
+        price_per_gallon: supplier_type.price_per_gallon,
+      },
+    });
+
+    setLoading(false);
+  } catch (error: any) {
+    console.error("❌ Error fetching supplier:", error);
+    toast.error("Failed to load supplier details", { icon: "❌" });
+    setLoading(false);
+  }
+};
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -86,7 +114,7 @@ export default function BookSupplier() {
     }
 
     if (!formData.quantity) {
-      newErrors.quantity = "Please enter quantity";
+      newErrors.quantity = "Please enter gallons needed";
     } else if (parseInt(formData.quantity) <= 0) {
       newErrors.quantity = "Quantity must be greater than 0";
     }
@@ -118,14 +146,36 @@ export default function BookSupplier() {
 
       console.log("📤 Creating booking:", payload);
 
-      const response = await api.post(
+      const bookingResponse = await api.post(
         `/booking?consumerId=${consumer.id}&supplierId=${supplierId}`,
         payload
       );
 
-      console.log("✅ Booking created:", response.data);
+      console.log("✅ Booking created:", bookingResponse.data);
+      const bookingId = bookingResponse.data.booking?.id;
 
-      toast.success("🎉 Booking created successfully!", {
+      // ✅ Create payment with calculated price
+      if (bookingId) {
+        try {
+          const paymentPayload = {
+            method: "pending",
+            amount: parseFloat(totalPrice), // ✅ Use calculated totalPrice
+          };
+
+          console.log("💳 Creating payment with:", paymentPayload);
+
+          const paymentResponse = await api.post(
+            `/payment?consumerId=${consumer.id}&supplierId=${supplierId}&bookingId=${bookingId}`,
+            paymentPayload
+          );
+
+          console.log("✅ Payment created:", paymentResponse.data);
+        } catch (paymentError: any) {
+          console.warn("⚠️ Payment creation warning:", paymentError);
+        }
+      }
+
+      toast.success("🎉 Booking created! Waiting for supplier confirmation...", {
         duration: 3000,
       });
 
@@ -261,6 +311,17 @@ export default function BookSupplier() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Pricing */}
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                      <DollarSign className="w-5 h-5 text-green-400" />
+                      <div>
+                        <p className="text-slate-400 text-sm">Price per Gallon</p>
+                        <p className="text-white font-bold text-lg">
+                          Rs. {supplier.supplier_type.price_per_gallon?.toFixed(2) || "0.00"}
+                        </p>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -313,10 +374,10 @@ export default function BookSupplier() {
                 {/* Quantity */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Quantity (Units)
+                    Gallons Needed
                   </label>
                   <div className="relative">
-                    <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <Droplets className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                     <input
                       type="number"
                       value={formData.quantity}
@@ -325,7 +386,7 @@ export default function BookSupplier() {
                         setErrors({ ...errors, quantity: "" });
                       }}
                       min="1"
-                      placeholder="Enter quantity"
+                      placeholder="Enter gallons"
                       className={`w-full pl-12 pr-4 py-3.5 rounded-xl bg-slate-800 border ${
                         errors.quantity
                           ? "border-red-500/50"
@@ -341,16 +402,41 @@ export default function BookSupplier() {
                   )}
                 </div>
 
+                {/* Price Calculation */}
+                {formData.quantity && supplier?.supplier_type?.price_per_gallon && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-slate-400 text-sm">Price Calculation:</span>
+                      <span className="text-green-400 font-mono text-sm">
+                        {formData.quantity} × Rs. {supplier.supplier_type.price_per_gallon.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-green-500/20">
+                      <span className="text-white font-bold">Total Amount:</span>
+                      <span className="text-green-400 font-bold text-xl">
+                        Rs. {totalPrice}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Info Box */}
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="text-blue-300 font-semibold mb-1">
-                      Booking Process
-                    </p>
-                    <p className="text-slate-400 leading-relaxed">
-                      Your booking will be sent to the supplier for approval.
-                      Once accepted, you can proceed with payment.
+                    <p className="text-blue-300 font-semibold mb-1">Booking Process</p>
+                    <p className="text-slate-400 leading-relaxed text-xs">
+                      1. Your booking is sent to the supplier
+                      <br />
+                      2. Supplier confirms they will deliver
+                      <br />
+                      3. After delivery completion, payment is finalized
+                      <br />
+                      4. You can rate the supplier
                     </p>
                   </div>
                 </div>
@@ -358,10 +444,10 @@ export default function BookSupplier() {
                 {/* Submit Button */}
                 <motion.button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !formData.quantity}
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  whileHover={!submitting ? { scale: 1.02, y: -2 } : {}}
-                  whileTap={!submitting ? { scale: 0.98 } : {}}
+                  whileHover={!submitting && formData.quantity ? { scale: 1.02, y: -2 } : {}}
+                  whileTap={!submitting && formData.quantity ? { scale: 0.98 } : {}}
                 >
                   {submitting ? (
                     <div className="flex items-center justify-center gap-2">
@@ -371,7 +457,7 @@ export default function BookSupplier() {
                   ) : (
                     <div className="flex items-center justify-center gap-2">
                       <CheckCircle className="w-5 h-5" />
-                      Confirm Booking
+                      Confirm Booking - Rs. {totalPrice}
                     </div>
                   )}
                 </motion.button>

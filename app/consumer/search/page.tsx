@@ -25,9 +25,10 @@ interface Supplier {
   supplier_type?: {
     category: string;
     vehicle_no: string;
+    price_per_gallon?: number;
   };
   stats?: {
-    average_rating: number;
+    average_stars: number;   // ← fix this
     total_ratings: number;
   };
 }
@@ -84,7 +85,7 @@ export default function SearchSuppliers() {
           } catch (error) {
             return {
               ...supplier,
-              stats: { average_rating: 0, total_ratings: 0 },
+              stats: { average_stars: 0, total_ratings: 0 },
             };
           }
         })
@@ -326,6 +327,22 @@ export default function SearchSuppliers() {
                 className="group relative p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 transition-all overflow-hidden"
                 whileHover={{ y: -8, scale: 1.02 }}
               >
+                  {/* Pricing Display - NEW */}
+                  {supplier.supplier_type?.price_per_gallon && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="my-4 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-sm">💰 Price per Gallon:</span>
+                        <span className="text-green-400 font-bold text-lg">
+                          Rs. {supplier.supplier_type.price_per_gallon.toFixed(2)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
                 {/* Background Gradient */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -363,10 +380,10 @@ export default function SearchSuppliers() {
                   {/* Rating */}
                   <div className="flex items-center gap-2 mb-4">
                     {renderStars(
-                      Math.round(supplier.stats?.average_rating || 0)
+                      Math.round(supplier.stats?.average_stars || 0)
                     )}
                     <span className="text-slate-400 text-sm">
-                      {supplier.stats?.average_rating?.toFixed(1) || "0.0"} (
+                      {supplier.stats?.average_stars?.toFixed(1) || "0.0"} (
                       {supplier.stats?.total_ratings || 0} reviews)
                     </span>
                   </div>

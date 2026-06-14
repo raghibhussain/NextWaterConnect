@@ -7,8 +7,11 @@ const VALID_CATEGORIES = ["Tanker", "Drinking Water"];
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { supplier_id, vehicle_no, category } = body;
+    const { supplier_id, vehicle_no, category, price_per_gallon } = body;
 
+    console.log("📥 POST Request Body:", body);
+
+    // ✅ Validation
     if (!supplier_id) {
       return NextResponse.json(
         { success: false, message: "supplier_id is required" },
@@ -19,6 +22,13 @@ export async function POST(request: Request) {
     if (!vehicle_no || !category) {
       return NextResponse.json(
         { success: false, message: "vehicle_no and category are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!price_per_gallon && price_per_gallon !== 0) {
+      return NextResponse.json(
+        { success: false, message: "price_per_gallon is required" },
         { status: 400 }
       );
     }
@@ -40,6 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // ✅ Check supplier exists
     const supplierExists = await db.supplier.findUnique({
       where: { id: BigInt(supplier_id) },
     });
@@ -51,6 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // ✅ Check if already exists
     const existingType = await db.supplier_type.findUnique({
       where: { supplier_id: BigInt(supplier_id) },
     });
@@ -65,14 +77,31 @@ export async function POST(request: Request) {
       );
     }
 
+    // ✅ Create with proper data types
     const newSupplierType = await db.supplier_type.create({
       data: {
         supplier_id: BigInt(supplier_id),
         vehicle_no: String(vehicle_no),
         category: String(category),
+        price_per_gallon: parseFloat(price_per_gallon), // ✅ KEY FIX
       },
-      include: { supplier: true },
+      include: {
+        supplier: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    console.log("✅ Created Supplier Type:", newSupplierType);
 
     return NextResponse.json(
       {
@@ -82,7 +111,6 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-
   } catch (error: any) {
     console.error("Supplier type creation error:", error);
     return NextResponse.json(

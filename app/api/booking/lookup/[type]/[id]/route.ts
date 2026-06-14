@@ -21,9 +21,9 @@ export async function GET(request: Request, { params }: Params) {
     // ✅ Validate type
     if (!["consumer", "supplier"].includes(type)) {
       return NextResponse.json(
-        { 
-          success: false, 
-          message: `Invalid type "${type}". Allowed: consumer, supplier` 
+        {
+          success: false,
+          message: `Invalid type "${type}". Allowed: consumer, supplier`,
         },
         { status: 400 }
       );
@@ -37,12 +37,15 @@ export async function GET(request: Request, { params }: Params) {
         include: {
           supplier: {
             include: {
-              // ✅ Include supplier's user details for full context
               user: true,
+              // ✅ ADDED: include supplier_type so price_per_gallon is available
+              supplier_type: true,
             },
           },
+          // ✅ ADDED: include payment so payment status shows on bookings page
+          payment: true,
         },
-        orderBy: { booking_date: "desc" }, // ✅ Most recent first
+        orderBy: { booking_date: "desc" },
       });
     } else if (type === "supplier") {
       bookings = await db.bookings.findMany({
@@ -50,12 +53,13 @@ export async function GET(request: Request, { params }: Params) {
         include: {
           consumer: {
             include: {
-              // ✅ Include consumer's user details for full context
               user: true,
             },
           },
+          // ✅ ADDED: include payment for supplier view too
+          payment: true,
         },
-        orderBy: { booking_date: "desc" }, // ✅ Most recent first
+        orderBy: { booking_date: "desc" },
       });
     }
 
@@ -72,18 +76,22 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
 
-    return NextResponse.json({
+    return NextResponse.json(
+      {
         success: true,
         total: bookings.length,
         bookings: bookings,
       },
       { status: 200 }
     );
-
   } catch (error: any) {
     console.error("Booking lookup error:", error);
     return NextResponse.json(
-      { success: false, error: "Internal Server Error", details: error.message },
+      {
+        success: false,
+        error: "Internal Server Error",
+        details: error.message,
+      },
       { status: 500 }
     );
   }

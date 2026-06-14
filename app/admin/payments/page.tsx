@@ -6,7 +6,7 @@ import api from "@/lib/axios";
 import toast from "react-hot-toast";
 import {
   DollarSign, CreditCard, TrendingUp, Loader2,
-  RefreshCw, ArrowDownUp
+  RefreshCw, ArrowDownUp, Clock, CheckCircle, XCircle
 } from "lucide-react";
 import Navbar from "@/app/components/dashboard/Navbar";
 import DataTable from "@/app/components/admin/DataTable";
@@ -56,25 +56,42 @@ export default function AdminPayments() {
   const [selectedStatus, setSelectedStatus] = useState("ALL");
 
   useEffect(() => {
+    // Fetch both stats and payments when page loads or status changes
     Promise.all([fetchStats(), fetchPayments(1)]);
   }, [selectedStatus]);
 
   const fetchStats = async () => {
     try {
       setStatsLoading(true);
-      const status = selectedStatus === "ALL" ? "" : selectedStatus;
-      const response = await api.get(`/admin/payments?status=${status}&page=1&limit=10`);
       
-      setStats({
-        total: response.data.pagination?.total || 0,
-        pending: 0,
-        paid: 0,
-        failed: 0,
-        total_amount: response.data.total_amount || 0,
+      // Fetch ALL, PENDING, PAID, FAILED counts in parallel
+      const [allResponse, pendingResponse, paidResponse, failedResponse] = await Promise.all([
+        api.get(`/admin/payments?page=1&limit=1`),
+        api.get(`/admin/payments?status=PENDING&page=1&limit=1`),
+        api.get(`/admin/payments?status=PAID&page=1&limit=1`),
+        api.get(`/admin/payments?status=FAILED&page=1&limit=1`),
+      ]);
+
+      console.log("📊 Payment Stats:", {
+        total: allResponse.data.pagination?.total,
+        pending: pendingResponse.data.pagination?.total,
+        paid: paidResponse.data.pagination?.total,
+        failed: failedResponse.data.pagination?.total,
+        amount: allResponse.data.total_amount,
       });
+
+      setStats({
+        total: allResponse.data.pagination?.total || 0,
+        pending: pendingResponse.data.pagination?.total || 0,
+        paid: paidResponse.data.pagination?.total || 0,
+        failed: failedResponse.data.pagination?.total || 0,
+        total_amount: allResponse.data.total_amount || 0,
+      });
+
       setStatsLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error fetching stats:", error);
+      toast.error("Failed to load payment statistics", { icon: "❌" });
       setStatsLoading(false);
     }
   };
@@ -111,6 +128,19 @@ export default function AdminPayments() {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return <Clock className="w-4 h-4" />;
+      case "PAID":
+        return <CheckCircle className="w-4 h-4" />;
+      case "FAILED":
+        return <XCircle className="w-4 h-4" />;
+      default:
+        return <DollarSign className="w-4 h-4" />;
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return `Rs. ${amount.toLocaleString("en-PK")}`;
   };
@@ -137,7 +167,12 @@ export default function AdminPayments() {
             <StatsCardSkeleton />
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {/* Total Payments */}
             <StatsCard
               title="Total Payments"
               value={stats.total}
@@ -145,28 +180,100 @@ export default function AdminPayments() {
               gradient="from-cyan-500 to-blue-600"
               delay={0}
             />
+
+            {/* Total Revenue */}
             <StatsCard
-              title="Total Amount"
+              title="Total Revenue"
               value={formatCurrency(stats.total_amount)}
               icon={DollarSign}
               gradient="from-green-500 to-emerald-600"
               delay={0.1}
             />
-            <StatsCard
-              title="Pending"
-              value={stats.pending}
-              icon={ArrowDownUp}
-              gradient="from-yellow-500 to-orange-600"
-              delay={0.2}
-            />
-            <StatsCard
-              title="Completed"
-              value={stats.paid}
-              icon={TrendingUp}
-              gradient="from-violet-500 to-purple-600"
-              delay={0.3}
-            />
-          </div>
+
+            {/* Pending Payments */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="relative p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all group overflow-hidden"
+              whileHover={{ y: -4, scale: 1.02 }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-yellow-500 to-orange-600 opacity-0 group-hover:opacity-5 transition-opacity duration-300"
+              />
+
+              <motion.div
+                className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-orange-600"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.4, duration: 0.6 }}
+              />
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <motion.div
+                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-white shadow-lg"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                  >
+                    <Clock className="w-6 h-6" />
+                  </motion.div>
+                </div>
+
+                <motion.h3
+                  className="text-3xl font-black text-white mb-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {stats.pending}
+                </motion.h3>
+
+                <p className="text-slate-400 text-sm font-medium">Pending Payments</p>
+              </div>
+            </motion.div>
+
+            {/* Completed Payments */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="relative p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-all group overflow-hidden"
+              whileHover={{ y: -4, scale: 1.02 }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 opacity-0 group-hover:opacity-5 transition-opacity duration-300"
+              />
+
+              <motion.div
+                className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+              />
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <motion.div
+                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white shadow-lg"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                  >
+                    <CheckCircle className="w-6 h-6" />
+                  </motion.div>
+                </div>
+
+                <motion.h3
+                  className="text-3xl font-black text-white mb-2"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  {stats.paid}
+                </motion.h3>
+
+                <p className="text-slate-400 text-sm font-medium">Completed Payments</p>
+              </div>
+            </motion.div>
+          </motion.div>
         ) : null}
 
         {/* Header */}
@@ -185,7 +292,10 @@ export default function AdminPayments() {
           </div>
 
           <motion.button
-            onClick={() => fetchPayments(pagination.page)}
+            onClick={() => {
+              fetchStats();
+              fetchPayments(pagination.page);
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-500 text-slate-400 hover:text-white transition-all"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -205,7 +315,7 @@ export default function AdminPayments() {
             <motion.button
               key={status}
               onClick={() => setSelectedStatus(status)}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+              className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${
                 selectedStatus === status
                   ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
                   : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700"
@@ -213,6 +323,10 @@ export default function AdminPayments() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
+              {status === "ALL" && <CreditCard className="w-4 h-4" />}
+              {status === "PENDING" && <Clock className="w-4 h-4" />}
+              {status === "PAID" && <CheckCircle className="w-4 h-4" />}
+              {status === "FAILED" && <XCircle className="w-4 h-4" />}
               {status}
             </motion.button>
           ))}
@@ -226,7 +340,9 @@ export default function AdminPayments() {
           className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden"
         >
           <div className="p-6 border-b border-slate-800">
-            <h3 className="text-xl font-bold text-white">All Payments</h3>
+            <h3 className="text-xl font-bold text-white">
+              {selectedStatus === "ALL" ? "All Payments" : `${selectedStatus} Payments`}
+            </h3>
           </div>
 
           <div className="p-6">
@@ -271,10 +387,11 @@ export default function AdminPayments() {
                   width: "col-span-2",
                   render: (value) => (
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(
+                      className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1 w-fit ${getStatusColor(
                         value
                       )}`}
                     >
+                      {getStatusIcon(value)}
                       {value}
                     </span>
                   ),
@@ -282,13 +399,13 @@ export default function AdminPayments() {
               ]}
               data={payments}
               loading={loading}
-                pagination={{
-                  total: pagination.total,
-                  page: pagination.page,
-                  limit: pagination.limit,
-                  totalPages: pagination.total_pages,
-                  onPageChange: (page) => fetchPayments(page),
-                }}
+              pagination={{
+                total: pagination.total,
+                page: pagination.page,
+                limit: pagination.limit,
+                totalPages: pagination.total_pages,
+                onPageChange: (page) => fetchPayments(page),
+              }}
             />
           </div>
         </motion.div>

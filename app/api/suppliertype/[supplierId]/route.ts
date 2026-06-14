@@ -62,7 +62,6 @@ export async function GET(request: Request, { params }: Params) {
       { success: true, supplier_type: supplierType },
       { status: 200 }
     );
-
   } catch (error: any) {
     console.error("Get supplier type error:", error);
     return NextResponse.json(
@@ -77,6 +76,9 @@ export async function PUT(request: Request, { params }: Params) {
   try {
     const { supplierId } = await params;
     const body = await request.json();
+
+    console.log("📥 PUT Request - Supplier ID:", supplierId);
+    console.log("📥 Request Body:", body);
 
     if (!supplierId || isNaN(Number(supplierId))) {
       return NextResponse.json(
@@ -99,13 +101,14 @@ export async function PUT(request: Request, { params }: Params) {
       );
     }
 
-    const { vehicle_no, category } = body;
+    const { vehicle_no, category, price_per_gallon } = body;
 
-    if (!vehicle_no && !category) {
+    // ✅ Validation
+    if (!vehicle_no && !category && price_per_gallon === undefined) {
       return NextResponse.json(
         {
           success: false,
-          message: "At least one field required: vehicle_no or category",
+          message: "At least one field required: vehicle_no, category, or price_per_gallon",
         },
         { status: 400 }
       );
@@ -121,15 +124,40 @@ export async function PUT(request: Request, { params }: Params) {
       );
     }
 
+    // ✅ Build update data
     const updateData: any = {};
-    if (vehicle_no !== undefined) updateData.vehicle_no = String(vehicle_no);
-    if (category !== undefined)   updateData.category   = String(category);
+    if (vehicle_no !== undefined) {
+      updateData.vehicle_no = String(vehicle_no);
+    }
+    if (category !== undefined) {
+      updateData.category = String(category);
+    }
+    if (price_per_gallon !== undefined) {
+      updateData.price_per_gallon = parseFloat(price_per_gallon); // ✅ KEY FIX
+    }
+
+    console.log("📤 Update Data:", updateData);
 
     const updatedType = await db.supplier_type.update({
       where: { supplier_id: BigInt(supplierId) },
       data: updateData,
-      include: { supplier: true },
+      include: {
+        supplier: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    console.log("✅ Updated Type:", updatedType);
 
     return NextResponse.json(
       {
@@ -139,7 +167,6 @@ export async function PUT(request: Request, { params }: Params) {
       },
       { status: 200 }
     );
-
   } catch (error: any) {
     console.error("Update supplier type error:", error);
     return NextResponse.json(

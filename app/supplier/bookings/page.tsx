@@ -7,7 +7,8 @@ import toast from "react-hot-toast";
 import {
   Package, Calendar, MapPin, User, Phone,
   CheckCircle, XCircle, Clock, Loader2,
-  RefreshCw, Eye, Check, X, AlertCircle
+  RefreshCw, Eye, Check, X, AlertCircle,
+  DollarSign
 } from "lucide-react";
 import Navbar from "@/app/components/dashboard/Navbar";
 import { TableSkeleton } from "@/app/components/dashboard/LoadingSkeleton";
@@ -24,6 +25,12 @@ interface Booking {
       phone: string;
       email: string;
     };
+  };
+  payment?: {
+    id: number;
+    amount: number;
+    status: string;
+    method: string;
   };
 }
 
@@ -93,6 +100,21 @@ export default function SupplierBookings() {
 
       const actionText = action === "accept" ? "accepted" : action === "reject" ? "rejected" : "completed";
       toast.success(`Booking ${actionText} successfully!`, { icon: "✅" });
+
+      // If completing, also update payment to PAID
+      if (action === "complete") {
+        const booking = bookings.find(b => b.id === bookingId);
+        if (booking?.payment?.id) {
+          try {
+            await api.put(`/payment/${booking.payment.id}`, {
+              status: "PAID",
+            });
+            toast.success("Payment finalized! ✅", { icon: "💳" });
+          } catch (paymentError) {
+            console.warn("Payment update warning:", paymentError);
+          }
+        }
+      }
 
       fetchBookings();
     } catch (error: any) {
@@ -232,7 +254,7 @@ export default function SupplierBookings() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Package className="w-4 h-4" />
-                            {booking.quantity} units
+                            {booking.quantity} gallons
                           </span>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-400">
@@ -255,6 +277,25 @@ export default function SupplierBookings() {
                         {booking.status}
                       </span>
                     </div>
+
+                    {/* Payment Display - HERE IS WHERE TO ADD IT */}
+                    {booking.payment && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4 p-3 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-sm">💰 Payment Amount:</span>
+                          <span className="text-green-400 font-bold">
+                            Rs. {booking.payment.amount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          Status: <span className="text-cyan-400 font-semibold">{booking.payment.status}</span>
+                        </div>
+                      </motion.div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex items-center gap-3 mt-4">
@@ -305,7 +346,7 @@ export default function SupplierBookings() {
                           ) : (
                             <CheckCircle className="w-4 h-4" />
                           )}
-                          Mark Complete
+                          Complete & Finalize Payment
                         </motion.button>
                       )}
 

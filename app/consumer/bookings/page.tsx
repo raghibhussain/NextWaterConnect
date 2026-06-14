@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import {
   Package, Calendar, MapPin, Truck, DollarSign,
   Star, Clock, CheckCircle, XCircle, Loader2,
-  RefreshCw, Filter, CreditCard, Eye
+  RefreshCw, CreditCard,
 } from "lucide-react";
 import Navbar from "@/app/components/dashboard/Navbar";
 import { TableSkeleton } from "@/app/components/dashboard/LoadingSkeleton";
@@ -25,6 +25,10 @@ interface Booking {
     service_area: string;
     user: {
       phone: string;
+    };
+    // ✅ FIX 1: supplier_type included so price_per_gallon is available
+    supplier_type?: {
+      price_per_gallon: number;
     };
   };
   payment?: {
@@ -44,8 +48,17 @@ export default function MyBookings() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    booking: Booking | null;
+  }>({ isOpen: false, booking: null });
+
+  // ✅ FIX 1: Computed at render time from selectedBooking — no editable state
+  const computedAmount = selectedBooking
+    ? selectedBooking.quantity *
+      (selectedBooking.supplier.supplier_type?.price_per_gallon ?? 0)
+    : 0;
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -64,10 +77,7 @@ export default function MyBookings() {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const response = await api.get(
-        `/booking/lookup/consumer/${consumerId}`
-      );
-
+      const response = await api.get(`/booking/lookup/consumer/${consumerId}`);
       console.log("📦 Bookings:", response.data);
       const bookingsData = response.data.bookings || [];
       setBookings(bookingsData);
@@ -84,9 +94,7 @@ export default function MyBookings() {
     if (selectedStatus === "ALL") {
       setFilteredBookings(bookings);
     } else {
-      setFilteredBookings(
-        bookings.filter((b) => b.status === selectedStatus)
-      );
+      setFilteredBookings(bookings.filter((b) => b.status === selectedStatus));
     }
   }, [selectedStatus, bookings]);
 
@@ -129,17 +137,21 @@ export default function MyBookings() {
   };
 
   const handlePayment = async () => {
-    if (!selectedBooking || !paymentAmount) {
-      toast.error("Please enter payment amount", { icon: "⚠️" });
+    // ✅ FIX 1: Validate using computedAmount, not a user-entered value
+    if (!selectedBooking || computedAmount <= 0) {
+      toast.error("Could not calculate payment amount. Please try again.", {
+        icon: "⚠️",
+      });
       return;
     }
 
     setPaymentLoading(true);
 
     try {
+      // ✅ FIX 1: Send computed amount — consumer cannot change it
       const payload = {
         method: paymentMethod,
-        amount: parseFloat(paymentAmount),
+        amount: computedAmount,
       };
 
       const response = await api.post(
@@ -148,33 +160,47 @@ export default function MyBookings() {
       );
 
       console.log("✅ Payment created:", response.data);
-      toast.success("💳 Payment submitted successfully!", { duration: 3000 });
-      
+
+      // ✅ FIX 2: Immediately mark payment as PAID after creation
+      const paymentId = response.data.payment?.id;
+      if (paymentId) {
+        await api.put(`/payment/${paymentId}`, { status: "PAID" });
+        console.log("✅ Payment marked as PAID");
+      }
+
+      toast.success("💳 Payment confirmed!", { duration: 3000 });
+
       setShowPaymentModal(false);
       setSelectedBooking(null);
-      setPaymentAmount("");
       fetchBookings();
     } catch (error: any) {
       console.error("❌ Payment error:", error);
-      toast.error(
-        error.response?.data?.message || "Payment failed",
-        { icon: "❌" }
-      );
+      toast.error(error.response?.data?.message || "Payment failed", {
+        icon: "❌",
+      });
     } finally {
       setPaymentLoading(false);
     }
   };
-  const [reviewModal, setReviewModal] = useState<{
-  isOpen: boolean;
-  booking: Booking | null;
-}>({ isOpen: false, booking: null });
+
+  const handleOpenPaymentModal = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setPaymentMethod("cash");
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedBooking(null);
+    setPaymentMethod("cash");
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar title="My Bookings" />
 
       <main className="flex-1 p-6 space-y-6">
-        {/* Filters */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -182,7 +208,8 @@ export default function MyBookings() {
         >
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {filteredBookings.length} Booking{filteredBookings.length !== 1 ? "s" : ""}
+              {filteredBookings.length} Booking
+              {filteredBookings.length !== 1 ? "s" : ""}
             </h2>
             <p className="text-slate-400 text-sm mt-1">
               Manage your water delivery orders
@@ -206,21 +233,23 @@ export default function MyBookings() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-wrap gap-3"
         >
-          {["ALL", "PENDING", "ACCEPTED", "COMPLETED", "REJECTED"].map((status) => (
-            <motion.button
-              key={status}
-              onClick={() => setSelectedStatus(status)}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                selectedStatus === status
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
-                  : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700"
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {status}
-            </motion.button>
-          ))}
+          {["ALL", "PENDING", "ACCEPTED", "COMPLETED", "REJECTED"].map(
+            (status) => (
+              <motion.button
+                key={status}
+                onClick={() => setSelectedStatus(status)}
+                className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                  selectedStatus === status
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
+                    : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700"
+                }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {status}
+              </motion.button>
+            )
+          )}
         </motion.div>
 
         {/* Bookings List */}
@@ -283,7 +312,7 @@ export default function MyBookings() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Package className="w-4 h-4" />
-                            {booking.quantity} units
+                            {booking.quantity} gallon
                           </span>
                           <span className="flex items-center gap-1">
                             <MapPin className="w-4 h-4" />
@@ -302,19 +331,46 @@ export default function MyBookings() {
                       </span>
                     </div>
 
+                    {/* ✅ FIX 1: Show price per gallon if available and no payment yet */}
+                    {booking.supplier.supplier_type?.price_per_gallon &&
+                      !booking.payment && (
+                        <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-800/50 mb-3">
+                          <DollarSign className="w-4 h-4 text-cyan-400" />
+                          <span className="text-sm text-slate-300">
+                            Price:{" "}
+                            <span className="text-white font-semibold">
+                              Rs.{" "}
+                              {booking.supplier.supplier_type.price_per_gallon.toFixed(
+                                2
+                              )}{" "}
+                              / gallon
+                            </span>{" "}
+                            · Total:{" "}
+                            <span className="text-green-400 font-bold">
+                              Rs.{" "}
+                              {(
+                                booking.quantity *
+                                booking.supplier.supplier_type.price_per_gallon
+                              ).toFixed(2)}
+                            </span>
+                          </span>
+                        </div>
+                      )}
+
                     {/* Payment Info */}
                     {booking.payment && (
                       <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-800/50 mb-3">
                         <DollarSign className="w-4 h-4 text-green-400" />
                         <span className="text-sm text-slate-300">
-                          Payment: Rs. {booking.payment.amount} ({booking.payment.method}) -{" "}
+                          Payment: Rs. {booking.payment.amount} (
+                          {booking.payment.method}) —{" "}
                           <span
                             className={
                               booking.payment.status === "PAID"
-                                ? "text-green-400"
+                                ? "text-green-400 font-semibold"
                                 : booking.payment.status === "PENDING"
-                                ? "text-yellow-400"
-                                : "text-red-400"
+                                ? "text-yellow-400 font-semibold"
+                                : "text-red-400 font-semibold"
                             }
                           >
                             {booking.payment.status}
@@ -327,10 +383,7 @@ export default function MyBookings() {
                     <div className="flex items-center gap-3">
                       {booking.status === "ACCEPTED" && !booking.payment && (
                         <motion.button
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setShowPaymentModal(true);
-                          }}
+                          onClick={() => handleOpenPaymentModal(booking)}
                           className="px-4 py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 text-sm font-semibold flex items-center gap-2"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
@@ -342,7 +395,9 @@ export default function MyBookings() {
 
                       {booking.status === "COMPLETED" && (
                         <motion.button
-                          onClick={() => setReviewModal({ isOpen: true, booking })}
+                          onClick={() =>
+                            setReviewModal({ isOpen: true, booking })
+                          }
                           className="px-4 py-2 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 text-sm font-semibold flex items-center gap-2"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
@@ -368,7 +423,7 @@ export default function MyBookings() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-            onClick={() => setShowPaymentModal(false)}
+            onClick={handleClosePaymentModal}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -378,10 +433,10 @@ export default function MyBookings() {
               className="bg-slate-900 rounded-2xl border border-slate-700 p-8 max-w-md w-full"
             >
               <h2 className="text-2xl font-bold text-white mb-6">
-                Make Payment
+                Confirm Payment
               </h2>
 
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-6">
                 <div className="p-4 rounded-xl bg-slate-800/50">
                   <p className="text-slate-400 text-sm">Supplier</p>
                   <p className="text-white font-semibold">
@@ -392,44 +447,55 @@ export default function MyBookings() {
                 <div className="p-4 rounded-xl bg-slate-800/50">
                   <p className="text-slate-400 text-sm">Quantity</p>
                   <p className="text-white font-semibold">
-                    {selectedBooking.quantity} units
+                    {selectedBooking.quantity} gallon
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-800/50">
+                  <p className="text-slate-400 text-sm">Rate</p>
+                  <p className="text-white font-semibold">
+                    Rs.{" "}
+                    {selectedBooking.supplier.supplier_type?.price_per_gallon?.toFixed(
+                      2
+                    ) ?? "N/A"}{" "}
+                    / gallon
+                  </p>
+                </div>
+
+                {/* ✅ FIX 1: Read-only computed total — not editable by consumer */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                  <p className="text-slate-400 text-sm">Total Amount</p>
+                  <p className="text-green-400 font-bold text-2xl">
+                    Rs. {computedAmount.toFixed(2)}
+                  </p>
+                  <p className="text-slate-500 text-xs mt-1">
+                    {selectedBooking.quantity} ×{" "}
+                    {selectedBooking.supplier.supplier_type?.price_per_gallon?.toFixed(
+                      2
+                    )}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Payment Method
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-cyan-500 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="online">Online Transfer</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
-                    Amount (Rs)
-                  </label>
-                  <input
-                    type="number"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="Enter amount"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-cyan-500 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                  />
-                </div>
+              {/* Payment Method */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  Payment Method
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-cyan-500 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="online">Online Transfer</option>
+                </select>
               </div>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-3">
                 <motion.button
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={handleClosePaymentModal}
                   className="flex-1 py-3 rounded-xl bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-all"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -438,33 +504,33 @@ export default function MyBookings() {
                 </motion.button>
                 <motion.button
                   onClick={handlePayment}
-                  disabled={paymentLoading}
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+                  disabled={paymentLoading || computedAmount <= 0}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold shadow-lg shadow-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   {paymentLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                   ) : (
-                    "Confirm Payment"
+                    `Pay Rs. ${computedAmount.toFixed(2)}`
                   )}
-
-
                 </motion.button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-                    {reviewModal.booking && (
-                  <ReviewModal
-                    isOpen={reviewModal.isOpen}
-                    onClose={() => setReviewModal({ isOpen: false, booking: null })}
-                    booking={reviewModal.booking}
-                    consumer={{ id: parseInt(consumerId) }}
-                    onSuccess={() => fetchBookings()}
-                  />
-                )}
+
+      {/* Review Modal */}
+      {reviewModal.booking && (
+        <ReviewModal
+          isOpen={reviewModal.isOpen}
+          onClose={() => setReviewModal({ isOpen: false, booking: null })}
+          booking={reviewModal.booking}
+          consumer={{ id: parseInt(consumerId) }}
+          onSuccess={() => fetchBookings()}
+        />
+      )}
     </div>
   );
 }
