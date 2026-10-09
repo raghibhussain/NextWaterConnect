@@ -79,3 +79,8 @@ npm run dev
 - MySQL
 - TypeScript
 - bcryptjs (Password Hashing)
+
+## 👤 Author
+
+**Raghib**
+GitHub: [@raghibhussain](https://github.com/raghibhussain)
